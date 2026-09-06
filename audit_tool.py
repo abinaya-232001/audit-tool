@@ -90,11 +90,17 @@ def audit_input(content: str, max_retries: int = 3) -> Optional[dict]:
     }
 
 
+import sys
+
 if __name__ == "__main__":
-    sample_input = """
-    def get_user(id):
-        query = "SELECT * FROM users WHERE id = " + id
-        return db.execute(query)
-    """
-    result = audit_input(sample_input)
+    if len(sys.argv) > 1:
+        with open(sys.argv[1], "r") as f:
+            content = f.read()
+    else:
+        content = """
+        def get_user(id):
+            query = "SELECT * FROM users WHERE id = " + id
+            return db.execute(query)
+        """
+    result = audit_input(content)
     print(json.dumps(result, indent=2))
