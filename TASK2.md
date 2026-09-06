@@ -3,58 +3,51 @@
 ## User Story 1 - Submitting content for audit
 
 **As a** non-technical manager,
-**I want to** submit a document or code snippet through a simple upload form,
-**so that** I can get a plain-language risk summary without needing to understand
-code or involve an engineer for a first pass.
+**I want to** upload a file or paste code/text into the audit tool,
+**so that** I can get a plain-language summary of risks without needing to
+read or understand the code myself.
 
 ```gherkin
 Feature: Submit content for audit
 
-  Scenario: Manager submits a valid document or snippet
+  Scenario: Manager submits code for review
     Given the manager is logged into the Audit Tool dashboard
-    And they have a file or pasted text ready to submit
-    When they click "New Audit" and submit the content
-    Then the system displays a "Processing..." status
-    And within 30 seconds shows a plain-language report with a summary,
-      a color-coded list of issues by severity, and suggested next steps
+    When they click "Upload", select a file or paste in text, and click "Submit"
+    Then they see a progress bar showing "Uploading... Analyzing... Done"
+    And once complete, they see a plain-English summary plus a color-coded
+      list of issues (red, yellow, or green depending on severity)
 
-  Scenario: Manager submits an empty or unsupported file
-    Given the manager is on the "New Audit" form
-    When they try to submit with no content, or an unsupported file type
-    Then the system shows a clear, non-technical message
-      (e.g. "Please add some text or upload a supported file")
+  Scenario: Manager submits with nothing entered
+    Given the manager is on the "New Audit" screen
+    When they click "Submit" without uploading a file or pasting any text
+    Then they see a simple message asking them to add content first
     And no request is sent to the audit engine
 ```
 
-*Note: the manager never interacts with raw JSON directly. The dashboard renders
-the structured API output (see Task 1's schema) as a readable report - a
-plain-English summary at the top, issues grouped and color-coded by severity
-(red/amber/green for High/Medium/Low), and fixes written as short action items.*
-
-## User Story 2 - Reviewing and prioritizing past reports
+## User Story 2 - Reviewing and escalating issues
 
 **As a** non-technical manager,
-**I want to** browse past audit reports and filter them by severity,
-**so that** I can quickly decide which issues to escalate to the engineering
-team without having to read every report in full.
+**I want to** see past audit reports and filter them by how serious the
+issues are,
+**so that** I can quickly decide what to send to the engineering team
+without reading every report in full.
 
 ```gherkin
-Feature: Review and prioritize audit reports
+Feature: Review and escalate audit reports
 
   Scenario: Manager filters reports by high severity
     Given the manager has at least one completed audit report
-    When they open the "Reports" dashboard
-    And select the filter "High severity only"
-    Then only issues marked High severity are shown
-    And each one displays its plain-language description and suggested fix
-    And the manager can click "Escalate" to notify the engineering team directly
+    When they open the "Reports" screen and select "High severity only"
+    Then only the high-severity issues are shown, each with a plain-English
+      description and a suggested fix
+    And the manager can click "Escalate" to notify the engineering team
 
-  Scenario: The audit fails partway through
+  Scenario: The audit fails
     Given the manager has submitted content for audit
-    When the underlying AI service fails or times out after retries
-    Then the manager sees a friendly error message, not a technical stack trace
-    And the failure is logged for the engineering team to investigate
-    And the manager is not shown a blank or partially-completed report
+    When the analysis fails or times out after the system retries
+    Then the manager sees a simple, friendly error message - not a technical
+      error
+    And the failure is logged for the engineering team to look into
 ```
 
 ## Data Flow
@@ -76,15 +69,16 @@ flowchart LR
 
 **Plain-text version:**
 
-1. **Manager submits input** - text pasted or a file uploaded through the dashboard.
-2. **API Gateway** - receives the request, applies auth and rate limiting.
-3. **Lambda (Request Handler)** - retrieves the LLM API key from Secrets Manager,
-   sends the content to the LLM, and validates the JSON response.
-4. **Validation loop** - if the response is malformed, the handler retries
-   automatically (see Task 1's error handling) before giving up gracefully.
-5. **Lambda (Report Formatter)** - converts the validated JSON into the final
-   report shape used by the dashboard.
-6. **Storage** - the full report is saved to S3; lightweight searchable metadata
-   (timestamp, submitter, severity counts) is saved to DynamoDB.
-7. **Dashboard** - the manager views a rendered, plain-language report pulled
-   from DynamoDB (for the list/filter view) and S3 (for the full report detail).
+1. **Manager submits input** - a file or pasted text through the dashboard.
+2. **API Gateway** - receives the request and applies auth/rate limiting.
+3. **Lambda (Request Handler)** - fetches the LLM API key from Secrets
+   Manager, sends the content to the LLM, and checks the response is valid
+   JSON.
+4. **Retry if needed** - if the response is malformed, it retries
+   automatically before giving up gracefully (see Task 1).
+5. **Lambda (Report Formatter)** - turns the validated result into the final
+   report shape.
+6. **Storage** - the full report goes to S3; searchable metadata (timestamp,
+   submitter, severity counts) goes to DynamoDB.
+7. **Dashboard** - the manager sees the finished report, rendered as plain
+   language rather than raw JSON.
